@@ -20,8 +20,6 @@ done
 if [ $written -eq 0 ]; then
   if command -v ryzenadj >/dev/null 2>&1; then
     sudo ryzenadj --stapm-limit="$WATTS" && written=1
-  elif command -v cpupower >/dev/null 2>&1; then
-    echo "$WATTS" >/dev/null && written=0
   fi
 fi
 if [ $written -eq 1 ]; then

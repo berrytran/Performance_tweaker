@@ -1,0 +1,8 @@
+Metadata-Version: 2.4
+Name: performance-tweaker
+Version: 0.1.0
+Summary: Linux Performance Tweaker
+Author: you
+Requires-Python: >=3.8
+Requires-Dist: PyQt5
+Requires-Dist: psutil

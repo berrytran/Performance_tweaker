@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Performance Tweaker
+Exec=performance-tweaker
+Icon=perf_tweaker
+Type=Application
+Categories=Utility;System;
+StartupNotify=true

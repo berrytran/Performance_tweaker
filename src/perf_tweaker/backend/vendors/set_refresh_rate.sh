@@ -13,7 +13,6 @@ if [ -z "$OUT" ]; then
   echo "UNSUPPORTED"
   exit 2
 fi
-# find matching mode line by refresh rate (best-effort)
 MODE_LINE="$(xrandr | awk -v out="$OUT" -v hz="$HZ" '
   $0 ~ ("^" out " ") {flag=1; next}
   flag && $0 ~ /^[ ]+[0-9]/ {
