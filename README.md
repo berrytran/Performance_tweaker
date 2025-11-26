@@ -19,7 +19,7 @@ CLI(for sudo)+UI based
    ```python3 run.py```
 
 3) Build AppImage (optional):
-   ./build_appimage.sh
+   ```./build_appimage.sh```
    - This downloads appimagetool and creates PerfTweaker-x86_64.AppImage in this folder.
 
 Notes and caveats:
