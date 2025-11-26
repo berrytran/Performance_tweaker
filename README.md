@@ -8,15 +8,15 @@ CLI(for sudo)+UI based
 # INSTALLATION
 
 1) Install system dependencies (system-wide):
-   sudo ./install.sh
+   ```sudo ./install.sh```
 
    Or for a single-user install:
-   ./install.sh --user
+   ```./install.sh --user```
 
 2) Run the app:
-   perf-tweaker
+   ```perf-tweaker```
    or
-   python3 run.py
+   ```python3 run.py```
 
 3) Build AppImage (optional):
    ./build_appimage.sh
