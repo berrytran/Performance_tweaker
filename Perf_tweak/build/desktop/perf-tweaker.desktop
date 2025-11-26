@@ -1,6 +1,7 @@
+#!/usr/bin/env xdg-open
 [Desktop Entry]
-Name=Performance Tweaker
-Exec=performance-tweaker
+Name=Perf Tweaker
+Exec=python3 /path/to/Perf_tweak/run.py
 Icon=perf_tweaker
 Type=Application
 Categories=Utility;System;
