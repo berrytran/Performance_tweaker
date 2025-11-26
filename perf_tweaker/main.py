@@ -1,6 +1,21 @@
 #!/usr/bin/env python3
 import os
 import sys
+import subprocess
+
+def ensure_root():
+    if os.geteuid() != 0:
+        try:
+            # Ask for sudo password upfront
+            subprocess.run(["sudo", "-v"], check=True)
+        except subprocess.CalledProcessError:
+            print("This app requires sudo privileges. Exiting.")
+            sys.exit(1)
+
+ensure_root()
+
+import os
+import sys
 import time
 import glob
 import shutil
@@ -455,12 +470,8 @@ class GpuTab(QWidget):
         if not self.gpu_fan_slider.isEnabled():
             return
         self.gpu_fan_label.setText(f"GPU Fan: {v} %")
-        if shutil.which("nvidia-settings") and os.environ.get("DISPLAY"):
-            try:
-                display = os.environ.get("DISPLAY")
-            except Exception:
-                display = None
-        if display:
+        display = os.environ.get("DISPLAY")
+        if shutil.which("nvidia-settings") and display:
             try:
                 subprocess.Popen(["sudo", "nvidia-settings", "-a", "[gpu:0]/GPUFanControlState=1"], env={**os.environ, "DISPLAY": display})
                 subprocess.Popen(["sudo", "nvidia-settings", "-a", f"[fan:0]/GPUTargetFanSpeed={v}"], env={**os.environ, "DISPLAY": display})
@@ -591,7 +602,6 @@ class GeneralTab(QWidget):
         self.update_power_mode_label()
 
     def update_power_mode_label(self):
-        # prefer platform_profile to avoid gi dependency; fallback to powerprofilesctl if present
         pp = "/sys/firmware/acpi/platform_profile"
         if os.path.exists(pp):
             try:
