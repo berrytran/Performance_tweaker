@@ -8,10 +8,10 @@ CLI(for sudo)+UI based
 # INSTALLATION
 
 1) Install system dependencies (system-wide):
-   ```sudo ./install.sh```
-
-   Or for a single-user install:
-   ```./install.sh --user```
+   ```git clone https://github.com/berrytran/Performance_tweaker.git
+cd Performance_tweaker
+chmod +x install.sh
+./install.sh```
 
 2) Run the app:
    ```perf-tweaker```
