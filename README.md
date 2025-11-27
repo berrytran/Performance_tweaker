@@ -23,6 +23,4 @@ CLI(for sudo)+UI based
    - This downloads appimagetool and creates PerfTweaker-x86_64.AppImage in this folder.
 
 Notes and caveats:
-- Vendor GPU drivers (NVIDIA/ROCm) usually require vendor repos and manual steps; installer installs common helper packages but can't add vendor repos automatically in all cases.
-- Some features require kernel support (/sys entries, hwmon). Run 'sudo sensors-detect' and reboot if needed.
-- If powerprofilesctl reports missing 'gi', ensure python3-gi / gir packages are installed (installer attempts to do that).
+- Vendor GPU drivers (NVIDIA/ROCm) usually require vendor repos and manual steps; installer installs common helper packages but can't add vendor repos automatically in all cases
