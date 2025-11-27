@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 choice="$1"
-if [ -z "$choice" ]; then
-  echo "Usage: $0 <auto|nvidia|intel|hybrid|off>"
-  exit 1
-fi
+if [ -z "$choice" ]; then echo "Usage: $0 <auto|nvidia|intel|hybrid|off>"; exit 1; fi
 if command -v prime-select >/dev/null 2>&1; then
   case "$choice" in
     nvidia) sudo prime-select nvidia && echo "OK" && exit 0;;
@@ -20,8 +17,5 @@ if command -v optimus-manager >/dev/null 2>&1; then
     auto) echo "OK" && exit 0;;
   esac
 fi
-if command -v switcherooctl >/dev/null 2>&1; then
-  echo "switcherooctl present; manual switching may be required" && exit 0
-fi
-echo "UNSUPPORTED"
-exit 2
+if command -v switcherooctl >/dev/null 2>&1; then echo "switcherooctl present; manual switching may be required" && exit 0; fi
+echo "UNSUPPORTED"; exit 2

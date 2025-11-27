@@ -2,65 +2,53 @@
 import os
 import sys
 import subprocess
-
-def ensure_root():
-    if os.geteuid() != 0:
-        try:
-            # Ask for sudo password upfront
-            subprocess.run(["sudo", "-v"], check=True)
-        except subprocess.CalledProcessError:
-            print("This app requires sudo privileges. Exiting.")
-            sys.exit(1)
-
-ensure_root()
-
-import os
-import sys
-import time
 import glob
 import shutil
-import subprocess
+import time
 import psutil
-from PyQt5.QtWidgets import (
-    QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout,
-    QSlider, QTabWidget, QPushButton, QMessageBox, QComboBox
-)
-from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QSlider, QTabWidget, QPushButton, QMessageBox, QComboBox
+from PyQt5.QtCore import Qt, QTimer
 
 BASE_DIR = os.path.dirname(__file__)
 DETECT_ALL = os.path.join(BASE_DIR, "backend", "detect", "all.sh")
 VENDORS_DIR = os.path.join(BASE_DIR, "backend", "vendors")
 
-def run_command(cmd, timeout=3, env=None):
+def run_cmd(cmd, timeout=2, env=None):
     try:
         return subprocess.check_output(cmd, shell=True, text=True, timeout=timeout, env=env).strip()
     except Exception:
         return ""
 
-def request_sudo_dialog(parent=None):
+def ensure_root_prompt(parent=None):
     try:
-        p = subprocess.run(["sudo", "-v"])
-        if p.returncode == 0:
+        if os.geteuid() == 0:
             return True
     except Exception:
         pass
+    for cmd in (["pkexec", "/bin/true"], ["sudo", "-v"]):
+        try:
+            subprocess.run(cmd, check=True)
+            return True
+        except Exception:
+            pass
     if parent is None:
         return False
     dlg = QMessageBox(parent)
-    dlg.setWindowTitle("Sudo required")
-    dlg.setText("Some controls require root. Enter your password in the terminal if you want full control.\nPress Retry to try again, or Continue to run without root.")
-    retry = dlg.addButton("Retry (enter password)", QMessageBox.AcceptRole)
-    cont = dlg.addButton("Continue without sudo", QMessageBox.RejectRole)
+    dlg.setWindowTitle("Root required?")
+    dlg.setText("This app can control hardware. It attempted to get root credentials but failed. Continue without root will disable some controls.")
+    retry = dlg.addButton("Retry (prompt)", QMessageBox.AcceptRole)
+    cont = dlg.addButton("Continue without root", QMessageBox.RejectRole)
     dlg.exec_()
     if dlg.clickedButton() == retry:
-        try:
-            p = subprocess.run(["sudo", "-v"])
-            return p.returncode == 0
-        except Exception:
-            return False
+        for cmd in (["pkexec", "/bin/true"], ["sudo", "-v"]):
+            try:
+                subprocess.run(cmd, check=True)
+                return True
+            except Exception:
+                pass
     return False
 
-def read_int_file(path):
+def read_int(path):
     try:
         with open(path, "r") as f:
             return int(f.read().strip())
@@ -76,11 +64,11 @@ def find_powercap_current_max():
         mx = None
         for name in files:
             if name.endswith("_power_limit_uw") or name.endswith("power_limit_uw") or name == "power_uw":
-                val = read_int_file(os.path.join(root, name))
+                val = read_int(os.path.join(root, name))
                 if val is not None:
                     cur = val / 1_000_000.0
             if name.endswith("_max_power_uw") or name.endswith("max_power_uw"):
-                val = read_int_file(os.path.join(root, name))
+                val = read_int(os.path.join(root, name))
                 if val is not None:
                     mx = val / 1_000_000.0
         if cur is not None or mx is not None:
@@ -102,7 +90,7 @@ def find_writable_hwmon_pwm():
     return None
 
 def has_dedicated_gpu():
-    out = run_command("lspci -nn")
+    out = run_cmd("lspci -nn")
     if not out:
         return False
     for line in out.splitlines():
@@ -111,35 +99,12 @@ def has_dedicated_gpu():
     for line in out.splitlines():
         if "VGA compatible controller" in line or "VGA" in line:
             low = line.lower()
-            if ("nvidia" in low) or ("amd" in low) or ("radeon" in low) or ("ati " in low):
+            if any(x in low for x in ("nvidia", "amd", "radeon", "ati")):
                 return True
     return False
 
-def nvidia_available():
-    return shutil.which("nvidia-smi") or shutil.which("nvidia-settings")
-
-def rocm_available():
-    return shutil.which("rocm-smi")
-
-def gpu_fan_available():
-    if not has_dedicated_gpu():
-        return False
-    if nvidia_available() or rocm_available():
-        return True
-    if os.path.isfile(os.path.join(VENDORS_DIR, "set_gpu_power.sh")):
-        return True
-    return False
-
-def cpu_power_available():
-    cur, mx = find_powercap_current_max()
-    if mx is not None:
-        return True
-    if os.path.isfile(os.path.join(VENDORS_DIR, "set_cpu_power.sh")):
-        return True
-    return False
-
 def parse_xrandr_rates():
-    out = run_command("xrandr --current")
+    out = run_cmd("xrandr --current")
     if not out:
         return []
     lines = out.splitlines()
@@ -206,7 +171,7 @@ def set_refresh_rate_hz(hz):
             return True
         except Exception:
             return False
-    out = run_command("xrandr --current")
+    out = run_cmd("xrandr --current")
     if not out:
         return False
     display = None
@@ -217,7 +182,7 @@ def set_refresh_rate_hz(hz):
     if not display:
         return False
     mode = None
-    lines = run_command("xrandr").splitlines()
+    lines = run_cmd("xrandr").splitlines()
     collect = False
     for line in lines:
         if line.startswith(display + " "):
@@ -239,8 +204,8 @@ def set_refresh_rate_hz(hz):
             if mode:
                 break
     if mode:
-        return run_command(f"xrandr --output {display} --mode {mode} --rate {hz}") != ""
-    return run_command(f"xrandr --output {display} --rate {hz}") != ""
+        return run_cmd(f"xrandr --output {display} --mode {mode} --rate {hz}") != ""
+    return run_cmd(f"xrandr --output {display} --rate {hz}") != ""
 
 def is_on_ac():
     for p in glob.glob("/sys/class/power_supply/*"):
@@ -256,10 +221,18 @@ def is_on_ac():
                     return v == "1"
         except Exception:
             continue
-    out = run_command("acpi -a", timeout=1)
+    out = run_cmd("acpi -a", timeout=1)
     if out:
         return "on-line" in out or "on line" in out
     return False
+
+def detect_gpu_switch_backends():
+    backends = {}
+    backends["prime-select"] = bool(shutil.which("prime-select"))
+    backends["optimus-manager"] = bool(shutil.which("optimus-manager"))
+    backends["switcherooctl"] = bool(shutil.which("switcherooctl"))
+    backends["nvidia-prime"] = bool(shutil.which("nvidia-prime"))
+    return backends
 
 class CpuTab(QWidget):
     def __init__(self, sudo_ok):
@@ -316,13 +289,13 @@ class CpuTab(QWidget):
 
     def refresh_detection(self):
         if os.path.isfile(DETECT_ALL):
-            out = run_command(f"bash '{DETECT_ALL}'")
+            out = run_cmd(f"bash '{DETECT_ALL}'")
             for line in out.splitlines():
                 if line.startswith("CPU_VENDOR="):
-                    self.vendor_label.setText("CPU: " + line.split("=",1)[1].strip())
+                    self.vendor_label.setText("CPU: " + line.split("=", 1)[1].strip())
 
     def update_live(self):
-        cpu_temp = run_command("sensors | awk -F: '/Package id 0|Core 0|Tdie|Tctl/ {print $2; exit}'").strip()
+        cpu_temp = run_cmd("sensors | awk -F: '/Package id 0|Core 0|Tdie|Tctl/ {print $2; exit}'").strip()
         freq = None
         try:
             f = psutil.cpu_freq()
@@ -350,7 +323,7 @@ class CpuTab(QWidget):
             self.cpu_fan_label.setText("CPU Fan: not adjustable")
 
     def update_availability(self):
-        power_ok = cpu_power_available() and self.sudo_ok and self.cpu_power_max is not None
+        power_ok = (self.cpu_power_max is not None) and self.sudo_ok
         fan_ok = (find_writable_hwmon_pwm() is not None) and self.sudo_ok
         self.cpu_power_slider.setEnabled(bool(power_ok))
         self.cpu_fan_slider.setEnabled(bool(fan_ok))
@@ -425,33 +398,33 @@ class GpuTab(QWidget):
 
     def refresh_detection(self):
         if os.path.isfile(DETECT_ALL):
-            out = run_command(f"bash '{DETECT_ALL}'")
+            out = run_cmd(f"bash '{DETECT_ALL}'")
             for line in out.splitlines():
                 if line.startswith("GPU_VENDOR="):
-                    self.vendor_label.setText("GPU: " + line.split("=",1)[1].strip())
+                    self.vendor_label.setText("GPU: " + line.split("=", 1)[1].strip())
 
     def update_live(self):
         if shutil.which("nvidia-smi"):
-            gtemp = run_command("nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader 2>/dev/null").strip()
-            util = run_command("nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader 2>/dev/null").strip()
+            gtemp = run_cmd("nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader 2>/dev/null").strip()
+            util = run_cmd("nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader 2>/dev/null").strip()
             if gtemp:
                 self.temp_util_label.setText(f"Temp: {gtemp} °C    Util: {util if util else '--'}")
         elif shutil.which("rocm-smi"):
-            gtemp = run_command("rocm-smi --showtemp 2>/dev/null").strip()
+            gtemp = run_cmd("rocm-smi --showtemp 2>/dev/null").strip()
             if gtemp:
                 self.temp_util_label.setText(f"Temp: {gtemp}")
         else:
             self.temp_util_label.setText("Temp: --    Util: --")
         if has_dedicated_gpu():
-            self.gpu_fan_label.setText("GPU Fan: available" if gpu_fan_available() else "GPU Fan: control method missing")
-            self.gpu_power_label.setText("GPU Power: adjustable" if gpu_fan_available() else "GPU Power: control method missing")
+            self.gpu_fan_label.setText("GPU Fan: available" if (os.path.isfile(os.path.join(VENDORS_DIR, "set_gpu_power.sh")) or shutil.which("nvidia-settings") or shutil.which("rocm-smi")) else "GPU Fan: control method missing")
+            self.gpu_power_label.setText("GPU Power: adjustable" if (os.path.isfile(os.path.join(VENDORS_DIR, "set_gpu_power.sh")) or shutil.which("nvidia-settings") or shutil.which("rocm-smi")) else "GPU Power: control method missing")
         else:
             self.gpu_fan_label.setText("GPU Fan: not applicable (iGPU only)")
             self.gpu_power_label.setText("GPU Power: not applicable (iGPU only)")
 
     def update_availability(self):
-        power_ok = gpu_fan_available() and self.sudo_ok
-        fan_ok = gpu_fan_available() and self.sudo_ok
+        power_ok = (os.path.isfile(os.path.join(VENDORS_DIR, "set_gpu_power.sh")) or shutil.which("nvidia-settings") or shutil.which("rocm-smi")) and self.sudo_ok
+        fan_ok = power_ok
         self.gpu_power_slider.setEnabled(bool(power_ok))
         self.gpu_fan_slider.setEnabled(bool(fan_ok))
 
@@ -504,6 +477,7 @@ class GeneralTab(QWidget):
         self.power_timer.timeout.connect(self.on_power_tick)
         self.power_timer.start(2000)
         self.last_ac = is_on_ac()
+        self.switch_backends = detect_gpu_switch_backends()
 
     def init_ui(self):
         layout = QVBoxLayout()
@@ -526,7 +500,6 @@ class GeneralTab(QWidget):
         gs = QHBoxLayout()
         self.gpu_switch_label = QLabel("GPU switching:")
         self.gpu_switch_combo = QComboBox()
-        self.gpu_switch_combo.addItems(["auto","nvidia","intel","hybrid","off"])
         self.gpu_switch_combo.currentIndexChanged.connect(self.on_gpu_switch_change)
         gs.addWidget(self.gpu_switch_label)
         gs.addWidget(self.gpu_switch_combo)
@@ -582,14 +555,15 @@ class GeneralTab(QWidget):
     def toggle_auto(self):
         self.auto_mode = self.auto_btn.isChecked()
         self.auto_btn.setText("Auto: on" if self.auto_mode else "Auto: off")
-        if self.auto_mode and not is_on_ac():
-            if self.rates:
+        if self.auto_mode:
+            if not is_on_ac() and self.rates:
                 lowest = min(self.rates, key=lambda x: x[1])[0]
                 set_refresh_rate_hz(lowest)
                 self.rate_label.setText(f"Refresh Rate: {lowest} Hz (auto)")
-        elif not self.auto_mode and self.user_selected_rate:
-            set_refresh_rate_hz(self.user_selected_rate)
-            self.rate_label.setText(f"Refresh Rate: {self.user_selected_rate} Hz")
+        else:
+            if self.user_selected_rate:
+                set_refresh_rate_hz(self.user_selected_rate)
+                self.rate_label.setText(f"Refresh Rate: {self.user_selected_rate} Hz")
 
     def on_power_mode_change(self, idx):
         mode = self.power_mode_combo.currentText()
@@ -611,7 +585,7 @@ class GeneralTab(QWidget):
                     return
             except Exception:
                 pass
-        out = run_command("powerprofilesctl get")
+        out = run_cmd("powerprofilesctl get")
         mode = out.strip() if out else "Unknown"
         self.power_mode_label.setText(f"Power Mode: {mode}")
 
@@ -643,6 +617,8 @@ class GeneralTab(QWidget):
                 pass
 
     def on_gpu_switch_change(self, idx):
+        if self.gpu_switch_combo.count() == 0:
+            return
         choice = self.gpu_switch_combo.currentText()
         script = os.path.join(VENDORS_DIR, "set_gpu_switch.sh")
         if os.path.isfile(script):
@@ -652,14 +628,40 @@ class GeneralTab(QWidget):
                 pass
 
     def update_gpu_switch_availability(self):
-        script = os.path.join(VENDORS_DIR, "set_gpu_switch.sh")
-        avail = os.path.isfile(script)
+        backends = detect_gpu_switch_backends()
         hw = has_dedicated_gpu()
-        self.gpu_switch_combo.setEnabled(avail and hw and self.sudo_ok)
+        available_backend = any(backends.values())
+        self.gpu_switch_combo.blockSignals(True)
+        self.gpu_switch_combo.clear()
+        choices = []
         if not hw:
-            self.gpu_switch_combo.setToolTip("No dGPU detected — switching not applicable")
-        elif not avail:
-            self.gpu_switch_combo.setToolTip("GPU switching backend missing; run installer to add backends")
+            self.gpu_switch_combo.setEnabled(False)
+            self.gpu_switch_combo.addItem("not applicable")
+            self.gpu_switch_combo.setToolTip("No discrete GPU detected")
+            self.gpu_switch_label.setText("GPU switching:")
+            self.gpu_switch_combo.blockSignals(False)
+            return
+        if backends.get("prime-select") or backends.get("nvidia-prime"):
+            choices.extend(["auto", "nvidia", "intel", "hybrid"])
+        if backends.get("optimus-manager"):
+            if "auto" not in choices:
+                choices.append("auto")
+            choices.extend([c for c in ("nvidia", "intel", "hybrid") if c not in choices])
+        if backends.get("switcherooctl") and not choices:
+            choices.append("auto")
+        if not choices:
+            self.gpu_switch_combo.addItem("not available")
+            self.gpu_switch_combo.setEnabled(False)
+            self.gpu_switch_combo.setToolTip("No GPU switching backend installed; run installer")
+            self.gpu_switch_label.setText("GPU switching:")
+            self.gpu_switch_combo.blockSignals(False)
+            return
+        for c in choices:
+            self.gpu_switch_combo.addItem(c)
+        self.gpu_switch_combo.setEnabled(self.sudo_ok)
+        self.gpu_switch_combo.setToolTip("" if self.sudo_ok else "Requires root to switch GPUs")
+        self.gpu_switch_label.setText("GPU switching:")
+        self.gpu_switch_combo.blockSignals(False)
 
     def on_power_tick(self):
         ac = is_on_ac()
@@ -674,13 +676,15 @@ class GeneralTab(QWidget):
                     set_refresh_rate_hz(self.user_selected_rate)
                     self.rate_label.setText(f"Refresh Rate: {self.user_selected_rate} Hz")
         self.update_power_mode_label()
+        self.switch_backends = detect_gpu_switch_backends()
+        self.update_gpu_switch_availability()
 
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Performance Tweaker")
         self.resize(920, 520)
-        self.sudo_ok = request_sudo_dialog(self)
+        self.sudo_ok = ensure_root_prompt(self)
         self.init_ui()
 
     def init_ui(self):

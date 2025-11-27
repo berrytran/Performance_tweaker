@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=Perf Tweaker
-Exec=perf-tweaker
+Exec=/usr/bin/perf-tweaker
 Icon=perf-tweaker
 Type=Application
 Categories=Utility;System;

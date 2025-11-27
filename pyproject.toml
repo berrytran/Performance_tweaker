@@ -1,6 +1,6 @@
 [project]
 name = "perf-tweaker"
 version = "0.1.0"
-description = "Perf Tweaker minimal"
+description = "Performance Tweaker"
 authors = [{name = "you"}]
 dependencies = ["PyQt5", "psutil"]
