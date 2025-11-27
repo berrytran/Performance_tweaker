@@ -8,7 +8,7 @@ CLI(for sudo)+UI based
 # INSTALLATION
 
 1) Install system dependencies (system-wide):
-   ```git clone https://github.com/berrytran/Performance_tweaker.git
+```git clone https://github.com/berrytran/Performance_tweaker.git
 cd Performance_tweaker
 chmod +x install.sh
 ./install.sh```
