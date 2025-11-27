@@ -13,12 +13,12 @@ CLI(for sudo)+UI based
 ```chmod +x install.sh```
 ```./install.sh```
 
-2) Run the app:
+3) Run the app:
    ```perf-tweaker```
    or
    ```python3 run.py```
 
-3) Build AppImage (optional):
+4) Build AppImage (optional):
    ```./build_appimage.sh```
    - This downloads appimagetool and creates PerfTweaker-x86_64.AppImage in this folder.
 
